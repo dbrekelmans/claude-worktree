@@ -90,3 +90,4 @@ src/
 - Uses `socket2` for port availability checking
 - Cross-platform terminal detection (macOS + Linux)
 - Optional Claude CLI integration for script generation
+- After implementing new features of changes, make sure to run `cargo test`, `cargo clippy` and `cargo fmt`

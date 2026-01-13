@@ -68,24 +68,6 @@ pub fn create_worktree(path: &Path, branch: &str) -> Result<()> {
     Ok(())
 }
 
-/// Create a new git worktree from an existing branch
-pub fn create_worktree_existing_branch(path: &Path, branch: &str) -> Result<()> {
-    let path_str = path.to_str().context("Invalid path for worktree")?;
-
-    let output = Command::new("git")
-        .args(["worktree", "add", path_str, branch])
-        .output()
-        .context("Failed to execute git worktree add")?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        bail!("git worktree add failed: {}", stderr);
-    }
-
-    Ok(())
-}
-
-
 /// Remove a git worktree
 pub fn remove_worktree(original_dir: &Path, worktree_dir: &Path, force: bool) -> Result<()> {
     let worktree_str = worktree_dir.to_str().context("Invalid worktree path")?;
@@ -121,43 +103,6 @@ pub fn remove_worktree(original_dir: &Path, worktree_dir: &Path, force: bool) ->
 
     Ok(())
 }
-
-/// List all git worktrees for the current repository
-pub fn list_worktrees() -> Result<Vec<String>> {
-    let output = Command::new("git")
-        .args(["worktree", "list", "--porcelain"])
-        .output()
-        .context("Failed to execute git worktree list")?;
-
-    if !output.status.success() {
-        bail!("git worktree list failed");
-    }
-
-    let output_str = String::from_utf8(output.stdout).context("Invalid UTF-8 in git output")?;
-
-    let worktrees: Vec<String> = output_str
-        .lines()
-        .filter(|line| line.starts_with("worktree "))
-        .map(|line| line.strip_prefix("worktree ").unwrap_or("").to_string())
-        .collect();
-
-    Ok(worktrees)
-}
-
-/// Get the current branch name
-pub fn current_branch() -> Result<String> {
-    let output = Command::new("git")
-        .args(["rev-parse", "--abbrev-ref", "HEAD"])
-        .output()
-        .context("Failed to get current branch")?;
-
-    if !output.status.success() {
-        bail!("Failed to get current branch");
-    }
-
-    Ok(String::from_utf8(output.stdout)?.trim().to_string())
-}
-
 
 /// Get the latest commit date in a worktree directory
 pub fn get_latest_commit_date(worktree_dir: &Path) -> Result<DateTime<Utc>> {

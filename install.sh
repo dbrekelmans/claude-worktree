@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="dbrekelmans/claude-worktree"
+REPO="riotbyte-com/worktree"
 BINARY_NAME="worktree"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 

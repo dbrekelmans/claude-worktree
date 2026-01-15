@@ -68,12 +68,8 @@ pub fn execute(param: Option<String>) -> Result<()> {
     }
 
     // Show display name if provided, with directory name
-    let name_display = if param.is_some() {
-        format!(
-            "{} - {}",
-            param.as_ref().unwrap().green(),
-            worktree_name.dimmed()
-        )
+    let name_display = if let Some(ref p) = param {
+        format!("{} - {}", p.green(), worktree_name.dimmed())
     } else {
         worktree_name.green().to_string()
     };

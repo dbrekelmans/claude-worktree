@@ -15,12 +15,26 @@ struct WorktreeInfo {
     days_inactive: i64,
 }
 
-pub fn execute(older_than: Option<u32>, force: bool) -> Result<()> {
-    // Find all worktrees and get their activity info
+pub fn execute(older_than: Option<u32>, force: bool, all: bool) -> Result<()> {
+    // Find worktrees and get their activity info
     let mut worktrees = find_worktrees_with_activity()?;
 
+    // Filter by current project unless --all is specified
+    let current_project = if !all { get_current_project() } else { None };
+
+    if let Some(ref project) = current_project {
+        worktrees.retain(|wt| &wt.state.project_name == project);
+    }
+
     if worktrees.is_empty() {
-        println!("{}", "No worktrees found.".dimmed());
+        if current_project.is_some() {
+            println!(
+                "{}",
+                "No worktrees found for this project. Use --all to see all worktrees.".dimmed()
+            );
+        } else {
+            println!("{}", "No worktrees found.".dimmed());
+        }
         return Ok(());
     }
 
@@ -57,11 +71,17 @@ pub fn execute(older_than: Option<u32>, force: bool) -> Result<()> {
         );
         for idx in &selected {
             let wt = &worktrees[*idx];
-            println!(
-                "  • {}/{}",
-                wt.state.project_name.blue(),
-                wt.state.name.green()
-            );
+            // Show display name with directory if custom name is set
+            let name_display = if wt.state.has_custom_name() {
+                format!(
+                    "{} - {}",
+                    wt.state.effective_name().green(),
+                    wt.state.name.dimmed()
+                )
+            } else {
+                wt.state.name.green().to_string()
+            };
+            println!("  • {}/{}", wt.state.project_name.blue(), name_display);
         }
 
         print!("\n{} ", "Proceed? (y/N):".yellow());
@@ -86,6 +106,23 @@ pub fn execute(older_than: Option<u32>, force: bool) -> Result<()> {
     println!("{}", "Cleanup complete!".green().bold());
 
     Ok(())
+}
+
+/// Try to get the current project name from the git repo or worktree state
+fn get_current_project() -> Option<String> {
+    // First check if we're inside a worktree
+    if let Ok(Some(state)) = crate::config::state::detect_worktree() {
+        return Some(state.project_name);
+    }
+
+    // Otherwise try to get the project name from git
+    if git::is_git_repo() {
+        if let Ok(name) = git::get_main_project_name() {
+            return Some(name);
+        }
+    }
+
+    None
 }
 
 fn find_worktrees_with_activity() -> Result<Vec<WorktreeInfo>> {
@@ -159,11 +196,18 @@ fn display_worktrees(worktrees: &[WorktreeInfo]) {
             inactive_str.normal()
         };
 
+        // Show display name with directory if custom name is set
+        let name_str = if wt.state.has_custom_name() {
+            format!("{} ({})", wt.state.effective_name(), wt.state.name)
+        } else {
+            wt.state.name.clone()
+        };
+
         println!(
             "  {:>3}  {:20} {:25} {:>12} {:>12}",
             (i + 1).to_string().cyan(),
             truncate(&wt.state.project_name, 20).blue(),
-            truncate(&wt.state.name, 25).green(),
+            truncate(&name_str, 25).green(),
             last_commit_str.dimmed(),
             inactive_colored
         );
@@ -260,10 +304,20 @@ fn prompt_selection(worktrees: &[WorktreeInfo]) -> Result<Vec<usize>> {
 }
 
 fn delete_worktree(state: &WorktreeState) -> Result<()> {
+    // Show display name with directory if custom name is set
+    let name_display = if state.has_custom_name() {
+        format!(
+            "{} - {}",
+            state.effective_name().green(),
+            state.name.dimmed()
+        )
+    } else {
+        state.name.green().to_string()
+    };
     println!(
         "  Deleting {}/{}...",
         state.project_name.blue(),
-        state.name.green()
+        name_display
     );
 
     let result = common::remove_worktree(state, &RemoveOptions::default())?;

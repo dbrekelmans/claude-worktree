@@ -15,8 +15,10 @@ pub fn execute(param: Option<String>) -> Result<()> {
         bail!("Not in a git repository. Please run this command from within a git repository.");
     }
 
-    let repo_root = git::get_repo_root()?;
-    let project_name = git::get_project_name()?;
+    // Use main repo root to ensure worktrees are created from the main project,
+    // even when running from within an existing worktree
+    let repo_root = git::get_main_repo_root()?;
+    let project_name = git::get_main_project_name()?;
 
     // Check if project is initialized
     let config_dir = paths::project_config_dir_in(&repo_root);
@@ -65,7 +67,13 @@ pub fn execute(param: Option<String>) -> Result<()> {
             .with_context(|| format!("Failed to create directory {}", parent.display()))?;
     }
 
-    println!("{} {}", "Creating worktree:".bold(), worktree_name.green());
+    // Show display name if provided, with directory name
+    let name_display = if let Some(ref p) = param {
+        format!("{} - {}", p.green(), worktree_name.dimmed())
+    } else {
+        worktree_name.green().to_string()
+    };
+    println!("{} {}", "Creating worktree:".bold(), name_display);
     println!("  {} {}", "Branch:".dimmed(), branch.cyan());
     println!("  {} {}", "Path:".dimmed(), worktree_dir.display());
 
@@ -96,15 +104,18 @@ pub fn execute(param: Option<String>) -> Result<()> {
     }
 
     // Create state
-    let state = WorktreeState::new(
+    // When param is provided, use it as the display name
+    let state = WorktreeState::builder(
         worktree_name.clone(),
         project_name.clone(),
-        repo_root.clone(),
         worktree_dir.clone(),
-        branch.clone(),
-        allocation.ports.clone(),
-        param.clone(),
-    );
+    )
+    .original_dir(repo_root.clone())
+    .branch(branch.clone())
+    .ports(allocation.ports.clone())
+    .param(param.clone())
+    .display_name(param.clone())
+    .build();
 
     // Save state to worktree
     state.save()?;
@@ -134,8 +145,10 @@ pub fn execute(param: Option<String>) -> Result<()> {
 
         if let Some(term) = term {
             println!("  Launching {}...", term.name());
+            // Use effective name (display name if set, otherwise directory name) for tmux session
+            let effective_name = state.effective_name();
             let launch_result = if term == terminal::Terminal::Tmux {
-                terminal::launch_tmux_session(&project_name, &worktree_name, &worktree_dir)
+                terminal::launch_tmux_session(&project_name, effective_name, &worktree_dir)
             } else {
                 terminal::launch(&term, &worktree_dir)
             };
@@ -159,7 +172,17 @@ pub fn execute(param: Option<String>) -> Result<()> {
     println!();
     println!("{}", "Worktree created successfully!".green().bold());
     println!();
-    println!("  {} {}", "Name:".dimmed(), worktree_name.green());
+    // Show display name if set, with directory name
+    let summary_name = if state.has_custom_name() {
+        format!(
+            "{} - {}",
+            state.effective_name().green(),
+            state.name.dimmed()
+        )
+    } else {
+        state.name.green().to_string()
+    };
+    println!("  {} {}", "Name:".dimmed(), summary_name);
     println!("  {} {}", "Path:".dimmed(), worktree_dir.display());
     println!("  {} {}", "Branch:".dimmed(), branch.cyan());
     println!(

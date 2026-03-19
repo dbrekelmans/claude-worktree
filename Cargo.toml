@@ -20,6 +20,9 @@ which = "6"
 socket2 = "0.5"
 walkdir = "2"
 
+[dev-dependencies]
+tempfile = "3"
+
 [profile.release]
 lto = true
 codegen-units = 1

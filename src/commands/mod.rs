@@ -1,6 +1,8 @@
 pub mod cleanup;
 pub mod close;
 pub mod common;
+pub mod cp;
+pub mod dotenv;
 pub mod init;
 pub mod list;
 pub mod new;

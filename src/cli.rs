@@ -118,10 +118,74 @@ pub enum Commands {
         name: Option<String>,
     },
 
+    /// Manage .env files in worktrees
+    Dotenv {
+        #[command(subcommand)]
+        command: DotenvCommands,
+    },
+
+    /// Copy files or directories between worktrees
+    Cp {
+        /// File or directory path (relative to worktree root)
+        path: String,
+
+        /// Source worktree name (defaults to main/original repo)
+        #[arg(long, add = ArgValueCandidates::new(worktree_names))]
+        from: Option<String>,
+
+        /// Destination worktree name (defaults to current worktree)
+        #[arg(long, add = ArgValueCandidates::new(worktree_names))]
+        to: Option<String>,
+
+        /// Overwrite destination if it exists
+        #[arg(short, long)]
+        force: bool,
+
+        /// Create empty file at destination if source doesn't exist
+        #[arg(long, conflicts_with = "skip_if_not_exists")]
+        create_if_not_exists: bool,
+
+        /// Silently exit if source doesn't exist
+        #[arg(long, conflicts_with = "create_if_not_exists")]
+        skip_if_not_exists: bool,
+
+        /// Swap source and destination
+        #[arg(short, long)]
+        reverse: bool,
+    },
+
     /// Generate shell completion scripts
     Completions {
         /// Shell to generate completions for
         #[arg(value_enum)]
         shell: Shell,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum DotenvCommands {
+    /// Get a value from the .env file
+    Get {
+        /// Environment variable key
+        key: String,
+        /// Worktree name (defaults to current)
+        #[arg(long, add = ArgValueCandidates::new(worktree_names))]
+        worktree: Option<String>,
+        /// Path to .env file (defaults to .env)
+        #[arg(long, default_value = ".env")]
+        file: String,
+    },
+    /// Set a value in the .env file
+    Set {
+        /// Key (or KEY=VALUE)
+        key: String,
+        /// Value (optional if key contains '=')
+        value: Option<String>,
+        /// Worktree name (defaults to current)
+        #[arg(long, add = ArgValueCandidates::new(worktree_names))]
+        worktree: Option<String>,
+        /// Path to .env file (defaults to .env)
+        #[arg(long, default_value = ".env")]
+        file: String,
     },
 }

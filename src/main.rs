@@ -11,7 +11,7 @@ mod terminal;
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
 use clap_complete::CompleteEnv;
-use cli::{Cli, Commands};
+use cli::{Cli, Commands, DotenvCommands};
 use config::settings::UserSettings;
 
 fn main() -> Result<()> {
@@ -54,6 +54,36 @@ fn main() -> Result<()> {
             all,
         }) => commands::cleanup::execute(older_than, force, all),
         Some(Commands::Status { name }) => commands::status::execute(name),
+        Some(Commands::Dotenv { command }) => match command {
+            DotenvCommands::Get {
+                key,
+                worktree,
+                file,
+            } => commands::dotenv::execute_get(&key, worktree, &file),
+            DotenvCommands::Set {
+                key,
+                value,
+                worktree,
+                file,
+            } => commands::dotenv::execute_set(&key, value, worktree, &file),
+        },
+        Some(Commands::Cp {
+            path,
+            from,
+            to,
+            force,
+            create_if_not_exists,
+            skip_if_not_exists,
+            reverse,
+        }) => commands::cp::execute(
+            path,
+            from,
+            to,
+            force,
+            create_if_not_exists,
+            skip_if_not_exists,
+            reverse,
+        ),
         Some(Commands::Path { name }) => commands::path::execute(name),
         Some(Commands::Completions { shell }) => {
             let mut cmd = Cli::command();

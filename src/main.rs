@@ -32,7 +32,8 @@ fn main() -> Result<()> {
         Some(Commands::Init {
             defaults,
             no_scripts,
-        }) => commands::init::execute(defaults, no_scripts),
+            no_ai,
+        }) => commands::init::execute(defaults, no_scripts, no_ai),
         Some(Commands::New { param }) => commands::new::execute(param),
         Some(Commands::Run) => commands::run::execute(),
         Some(Commands::Stop) => commands::stop::execute(),

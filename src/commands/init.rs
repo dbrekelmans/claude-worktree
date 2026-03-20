@@ -10,7 +10,7 @@ use crate::config::{
 use crate::git;
 use crate::scripts;
 
-pub fn execute(defaults: bool, no_scripts: bool) -> Result<()> {
+pub fn execute(defaults: bool, no_scripts: bool, no_ai: bool) -> Result<()> {
     // Check if we're in a git repository
     if !git::is_git_repo() {
         bail!("Not in a git repository. Please run this command from within a git repository.");
@@ -76,7 +76,7 @@ pub fn execute(defaults: bool, no_scripts: bool) -> Result<()> {
     // Generate scripts
     if !no_scripts {
         println!();
-        generate_scripts(&config_dir, &repo_root)?;
+        generate_scripts(&config_dir, &repo_root, no_ai)?;
     }
 
     println!();
@@ -166,8 +166,15 @@ fn prompt_local_settings() -> Result<LocalSettings> {
     Ok(local_settings)
 }
 
-fn generate_scripts(config_dir: &std::path::Path, project_dir: &std::path::Path) -> Result<()> {
-    let scripts = if scripts::is_claude_available() {
+fn generate_scripts(
+    config_dir: &std::path::Path,
+    project_dir: &std::path::Path,
+    no_ai: bool,
+) -> Result<()> {
+    let scripts = if no_ai {
+        println!("  Using template scripts...");
+        scripts::generate_templates()
+    } else if scripts::is_claude_available() {
         print!("Generate scripts with Claude CLI? (y/n) [y]: ");
         io::stdout().flush()?;
         let input = read_line()?.to_lowercase();

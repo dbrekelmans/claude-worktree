@@ -33,7 +33,7 @@ pub fn execute(param: Option<String>) -> Result<()> {
 
         if input.is_empty() || input == "y" || input == "yes" {
             // Run init with defaults=false, no_scripts=false
-            super::init::execute(false, false)?;
+            super::init::execute(false, false, false)?;
             println!();
         } else {
             bail!(

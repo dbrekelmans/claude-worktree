@@ -30,6 +30,10 @@ pub enum Commands {
         /// Skip script generation
         #[arg(long)]
         no_scripts: bool,
+
+        /// Skip AI-powered script generation, use templates instead
+        #[arg(long)]
+        no_ai: bool,
     },
 
     /// Execute the project's run script

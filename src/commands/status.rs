@@ -1,12 +1,12 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
 use colored::Colorize;
 use std::process;
-use walkdir::WalkDir;
 
-use crate::config::{paths, state::WorktreeState};
+use super::common;
+use crate::config::state::WorktreeState;
 
 pub fn execute(name: Option<String>) -> Result<()> {
-    let worktree_state = match resolve_worktree(name)? {
+    let worktree_state = match common::resolve_worktree(name)? {
         Some(state) => state,
         None => {
             eprintln!("{}", "Error: Not in a worktree directory".red());
@@ -16,55 +16,6 @@ pub fn execute(name: Option<String>) -> Result<()> {
 
     display_status(&worktree_state);
     Ok(())
-}
-
-/// Resolve which worktree to show status for
-fn resolve_worktree(name: Option<String>) -> Result<Option<WorktreeState>> {
-    // If name provided, find by name
-    if let Some(name) = name {
-        let all_worktrees = find_all_worktrees()?;
-        let matches: Vec<_> = all_worktrees
-            .into_iter()
-            .filter(|wt| wt.matches_identifier(&name))
-            .collect();
-
-        match matches.len() {
-            0 => bail!("No worktree found with name '{}'", name),
-            1 => return Ok(Some(matches.into_iter().next().unwrap())),
-            _ => bail!(
-                "Multiple worktrees match '{}'. Please be more specific.",
-                name
-            ),
-        }
-    }
-
-    // Try to detect current worktree
-    crate::config::state::detect_worktree()
-}
-
-/// Find all worktrees in the global directory
-fn find_all_worktrees() -> Result<Vec<WorktreeState>> {
-    let mut worktrees = Vec::new();
-    let base_dir = paths::global_worktrees_dir()?;
-
-    if !base_dir.exists() {
-        return Ok(worktrees);
-    }
-
-    for entry in WalkDir::new(&base_dir)
-        .min_depth(1)
-        .max_depth(3)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
-        if entry.file_name() == "state.json" {
-            if let Ok(state) = WorktreeState::load(entry.path()) {
-                worktrees.push(state);
-            }
-        }
-    }
-
-    Ok(worktrees)
 }
 
 /// Display the status of a worktree

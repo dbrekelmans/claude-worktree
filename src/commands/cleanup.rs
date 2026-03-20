@@ -2,10 +2,9 @@ use anyhow::{bail, Result};
 use chrono::Utc;
 use colored::Colorize;
 use std::io::{self, Write};
-use walkdir::WalkDir;
 
 use super::common::{self, RemoveOptions};
-use crate::config::{paths, state::WorktreeState};
+use crate::config::state::WorktreeState;
 use crate::git;
 
 /// Worktree with activity information
@@ -20,7 +19,11 @@ pub fn execute(older_than: Option<u32>, force: bool, all: bool) -> Result<()> {
     let mut worktrees = find_worktrees_with_activity()?;
 
     // Filter by current project unless --all is specified
-    let current_project = if !all { get_current_project() } else { None };
+    let current_project = if !all {
+        common::get_current_project()
+    } else {
+        None
+    };
 
     if let Some(ref project) = current_project {
         worktrees.retain(|wt| &wt.state.project_name == project);
@@ -108,58 +111,28 @@ pub fn execute(older_than: Option<u32>, force: bool, all: bool) -> Result<()> {
     Ok(())
 }
 
-/// Try to get the current project name from the git repo or worktree state
-fn get_current_project() -> Option<String> {
-    // First check if we're inside a worktree
-    if let Ok(Some(state)) = crate::config::state::detect_worktree() {
-        return Some(state.project_name);
-    }
-
-    // Otherwise try to get the project name from git
-    if git::is_git_repo() {
-        if let Ok(name) = git::get_main_project_name() {
-            return Some(name);
-        }
-    }
-
-    None
-}
-
 fn find_worktrees_with_activity() -> Result<Vec<WorktreeInfo>> {
-    let mut result = Vec::new();
-    let base_dir = paths::global_worktrees_dir()?;
-
-    if !base_dir.exists() {
-        return Ok(result);
-    }
-
+    let worktrees = common::find_all_worktrees()?;
     let now = Utc::now();
 
-    for entry in WalkDir::new(&base_dir)
-        .min_depth(1)
-        .max_depth(3)
+    let mut result: Vec<WorktreeInfo> = worktrees
         .into_iter()
-        .filter_map(|e| e.ok())
-    {
-        if entry.file_name() == "state.json" {
-            if let Ok(state) = WorktreeState::load(entry.path()) {
-                let last_commit = git::get_latest_commit_date(&state.worktree_dir).ok();
+        .map(|state| {
+            let last_commit = git::get_latest_commit_date(&state.worktree_dir).ok();
 
-                let days_inactive = if let Some(commit_date) = last_commit {
-                    (now - commit_date).num_days()
-                } else {
-                    // If no commit info, use creation date
-                    (now - state.created_at).num_days()
-                };
+            let days_inactive = if let Some(commit_date) = last_commit {
+                (now - commit_date).num_days()
+            } else {
+                (now - state.created_at).num_days()
+            };
 
-                result.push(WorktreeInfo {
-                    state,
-                    last_commit,
-                    days_inactive,
-                });
+            WorktreeInfo {
+                state,
+                last_commit,
+                days_inactive,
             }
-        }
-    }
+        })
+        .collect();
 
     // Sort by days inactive (most inactive first)
     result.sort_by(|a, b| b.days_inactive.cmp(&a.days_inactive));

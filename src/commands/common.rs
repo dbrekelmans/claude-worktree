@@ -1,6 +1,7 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
+use walkdir::WalkDir;
 
-use crate::config::state::WorktreeState;
+use crate::config::{paths, state::WorktreeState};
 use crate::git;
 use crate::ports;
 use crate::scripts;
@@ -72,4 +73,78 @@ pub fn remove_worktree(state: &WorktreeState, options: &RemoveOptions) -> Result
     }
 
     Ok(result)
+}
+
+/// Find all worktrees in the global directory, sorted newest-first
+pub fn find_all_worktrees() -> Result<Vec<WorktreeState>> {
+    let mut worktrees = Vec::new();
+    let base_dir = paths::global_worktrees_dir()?;
+
+    if !base_dir.exists() {
+        return Ok(worktrees);
+    }
+
+    for entry in WalkDir::new(&base_dir)
+        .min_depth(1)
+        .max_depth(3)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
+        if entry.file_name() == "state.json" {
+            if let Ok(state) = WorktreeState::load(entry.path()) {
+                worktrees.push(state);
+            }
+        }
+    }
+
+    worktrees.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    Ok(worktrees)
+}
+
+/// Try to get the current project name from the git repo or worktree state
+pub fn get_current_project() -> Option<String> {
+    if let Ok(Some(state)) = crate::config::state::detect_worktree() {
+        return Some(state.project_name);
+    }
+
+    if git::is_git_repo() {
+        if let Ok(name) = git::get_main_project_name() {
+            return Some(name);
+        }
+    }
+
+    None
+}
+
+/// Find worktrees for the current project, or all if not in a project
+pub fn find_worktrees_for_current_project() -> Result<Vec<WorktreeState>> {
+    let mut worktrees = find_all_worktrees()?;
+
+    if let Some(project) = get_current_project() {
+        worktrees.retain(|wt| wt.project_name == project);
+    }
+
+    Ok(worktrees)
+}
+
+/// Resolve a worktree by name identifier, falling back to detecting the current worktree
+pub fn resolve_worktree(name: Option<String>) -> Result<Option<WorktreeState>> {
+    if let Some(name) = name {
+        let all_worktrees = find_all_worktrees()?;
+        let matches: Vec<_> = all_worktrees
+            .into_iter()
+            .filter(|wt| wt.matches_identifier(&name))
+            .collect();
+
+        match matches.len() {
+            0 => bail!("No worktree found with name '{}'", name),
+            1 => return Ok(Some(matches.into_iter().next().unwrap())),
+            _ => bail!(
+                "Multiple worktrees match '{}'. Please be more specific.",
+                name
+            ),
+        }
+    }
+
+    crate::config::state::detect_worktree()
 }

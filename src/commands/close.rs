@@ -1,11 +1,9 @@
 use anyhow::{bail, Result};
 use colored::Colorize;
 use std::io::{self, Write};
-use walkdir::WalkDir;
 
 use super::common::{self, RemoveOptions};
-use crate::config::{paths, state::WorktreeState};
-use crate::git;
+use crate::config::state::WorktreeState;
 use crate::terminal;
 
 pub fn execute(name: Option<String>, force: bool, interactive: bool) -> Result<()> {
@@ -115,7 +113,7 @@ pub fn execute(name: Option<String>, force: bool, interactive: bool) -> Result<(
 fn resolve_worktree(name: Option<String>, interactive: bool) -> Result<WorktreeState> {
     // If interactive mode, show selection (filtered by current project)
     if interactive {
-        let worktrees = find_worktrees_for_current_project()?;
+        let worktrees = common::find_worktrees_for_current_project()?;
         if worktrees.is_empty() {
             bail!("No worktrees found for this project.");
         }
@@ -125,7 +123,7 @@ fn resolve_worktree(name: Option<String>, interactive: bool) -> Result<WorktreeS
     // If name provided, find by name (search current project first, then all)
     if let Some(name) = name {
         // First try current project
-        let project_worktrees = find_worktrees_for_current_project()?;
+        let project_worktrees = common::find_worktrees_for_current_project()?;
         let matches: Vec<_> = project_worktrees
             .into_iter()
             .filter(|wt| wt.matches_identifier(&name))
@@ -140,7 +138,7 @@ fn resolve_worktree(name: Option<String>, interactive: bool) -> Result<WorktreeS
         }
 
         // If not found in current project, search all worktrees
-        let all_worktrees = find_all_worktrees()?;
+        let all_worktrees = common::find_all_worktrees()?;
         let matches: Vec<_> = all_worktrees
             .into_iter()
             .filter(|wt| wt.matches_identifier(&name))
@@ -162,65 +160,11 @@ fn resolve_worktree(name: Option<String>, interactive: bool) -> Result<WorktreeS
     }
 
     // Not in a worktree - show interactive selection (filtered by current project)
-    let worktrees = find_worktrees_for_current_project()?;
+    let worktrees = common::find_worktrees_for_current_project()?;
     if worktrees.is_empty() {
         bail!("No worktrees found for this project.");
     }
     select_worktree(&worktrees)
-}
-
-/// Try to get the current project name from the git repo or worktree state
-fn get_current_project() -> Option<String> {
-    // First check if we're inside a worktree
-    if let Ok(Some(state)) = crate::config::state::detect_worktree() {
-        return Some(state.project_name);
-    }
-
-    // Otherwise try to get the project name from git
-    if git::is_git_repo() {
-        if let Ok(name) = git::get_main_project_name() {
-            return Some(name);
-        }
-    }
-
-    None
-}
-
-/// Find worktrees for the current project, or all if not in a project
-fn find_worktrees_for_current_project() -> Result<Vec<WorktreeState>> {
-    let mut worktrees = find_all_worktrees()?;
-
-    if let Some(project) = get_current_project() {
-        worktrees.retain(|wt| wt.project_name == project);
-    }
-
-    Ok(worktrees)
-}
-
-/// Find all worktrees in the global directory
-fn find_all_worktrees() -> Result<Vec<WorktreeState>> {
-    let mut worktrees = Vec::new();
-    let base_dir = paths::global_worktrees_dir()?;
-
-    if !base_dir.exists() {
-        return Ok(worktrees);
-    }
-
-    for entry in WalkDir::new(&base_dir)
-        .min_depth(1)
-        .max_depth(3)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
-        if entry.file_name() == "state.json" {
-            if let Ok(state) = WorktreeState::load(entry.path()) {
-                worktrees.push(state);
-            }
-        }
-    }
-
-    worktrees.sort_by(|a, b| b.created_at.cmp(&a.created_at));
-    Ok(worktrees)
 }
 
 /// Interactive worktree selection

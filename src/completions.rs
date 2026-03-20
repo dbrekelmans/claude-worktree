@@ -1,19 +1,17 @@
 use clap_complete::engine::CompletionCandidate;
-use walkdir::WalkDir;
 
-use crate::config::{paths, state::WorktreeState};
-use crate::git;
+use crate::commands::common;
 
 /// Get worktree name completion candidates
 /// Returns all worktree names, optionally filtered by current project
 pub fn worktree_names() -> Vec<CompletionCandidate> {
-    let worktrees = match find_all_worktrees() {
+    let worktrees = match common::find_all_worktrees() {
         Ok(wts) => wts,
         Err(_) => return vec![],
     };
 
     // Try to get the current project to filter results
-    let current_project = get_current_project();
+    let current_project = common::get_current_project();
 
     worktrees
         .into_iter()
@@ -41,46 +39,4 @@ pub fn worktree_names() -> Vec<CompletionCandidate> {
             candidates
         })
         .collect()
-}
-
-/// Find all worktrees across all projects
-fn find_all_worktrees() -> anyhow::Result<Vec<WorktreeState>> {
-    let mut worktrees = Vec::new();
-    let base_dir = paths::global_worktrees_dir()?;
-
-    if !base_dir.exists() {
-        return Ok(worktrees);
-    }
-
-    for entry in WalkDir::new(&base_dir)
-        .min_depth(1)
-        .max_depth(3)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
-        if entry.file_name() == "state.json" {
-            if let Ok(state) = WorktreeState::load(entry.path()) {
-                worktrees.push(state);
-            }
-        }
-    }
-
-    Ok(worktrees)
-}
-
-/// Try to get the current project name from the git repo or worktree state
-fn get_current_project() -> Option<String> {
-    // First check if we're inside a worktree
-    if let Ok(Some(state)) = crate::config::state::detect_worktree() {
-        return Some(state.project_name);
-    }
-
-    // Otherwise try to get the project name from git
-    if git::is_git_repo() {
-        if let Ok(name) = git::get_main_project_name() {
-            return Some(name);
-        }
-    }
-
-    None
 }

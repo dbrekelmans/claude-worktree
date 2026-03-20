@@ -1,10 +1,9 @@
 use anyhow::Result;
 use colored::Colorize;
 use std::collections::HashMap;
-use walkdir::WalkDir;
 
-use crate::config::{paths, state::WorktreeState};
-use crate::git;
+use super::common;
+use crate::config::state::WorktreeState;
 use crate::ports::PortAllocations;
 
 pub fn execute(json: bool, all: bool) -> Result<()> {
@@ -16,10 +15,14 @@ pub fn execute(json: bool, all: bool) -> Result<()> {
     }
 
     // Find all worktrees
-    let mut worktrees = find_all_worktrees()?;
+    let mut worktrees = common::find_all_worktrees()?;
 
     // Filter by current project unless --all is specified
-    let current_project = if !all { get_current_project() } else { None };
+    let current_project = if !all {
+        common::get_current_project()
+    } else {
+        None
+    };
 
     if let Some(ref project) = current_project {
         worktrees.retain(|wt| &wt.project_name == project);
@@ -46,51 +49,6 @@ pub fn execute(json: bool, all: bool) -> Result<()> {
     }
 
     Ok(())
-}
-
-/// Try to get the current project name from the git repo or worktree state
-fn get_current_project() -> Option<String> {
-    // First check if we're inside a worktree
-    if let Ok(Some(state)) = crate::config::state::detect_worktree() {
-        return Some(state.project_name);
-    }
-
-    // Otherwise try to get the project name from git
-    if git::is_git_repo() {
-        if let Ok(name) = git::get_main_project_name() {
-            return Some(name);
-        }
-    }
-
-    None
-}
-
-fn find_all_worktrees() -> Result<Vec<WorktreeState>> {
-    let mut worktrees = Vec::new();
-    let base_dir = paths::global_worktrees_dir()?;
-
-    if !base_dir.exists() {
-        return Ok(worktrees);
-    }
-
-    // Walk through all directories looking for state.json files
-    for entry in WalkDir::new(&base_dir)
-        .min_depth(1)
-        .max_depth(3)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
-        if entry.file_name() == "state.json" {
-            if let Ok(state) = WorktreeState::load(entry.path()) {
-                worktrees.push(state);
-            }
-        }
-    }
-
-    // Sort by creation time (newest first)
-    worktrees.sort_by(|a, b| b.created_at.cmp(&a.created_at));
-
-    Ok(worktrees)
 }
 
 fn display_table(worktrees: &[WorktreeState], filtered_by_project: bool) {

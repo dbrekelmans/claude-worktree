@@ -127,9 +127,17 @@ echo "Allocated ports: $WORKTREE_PORT_0 - $WORKTREE_PORT_9"
 # TODO: Add your setup commands here
 # Examples:
 # - npm install
-# - cp .env.example .env
 # - Update .env with allocated ports
 # - Run database migrations
+
+# Copy files from the main repo into this worktree using `worktree cp`:
+# worktree cp .env --skip-if-not-exists
+# worktree cp config/local.json --create-if-not-exists
+
+# Set environment variables in a .env file using `worktree dotenv`:
+# worktree dotenv set PORT=$WORKTREE_PORT_0
+# worktree dotenv set DATABASE_URL="postgres://localhost:5432/mydb_$WORKTREE_NAME"
+# worktree dotenv set REDIS_URL="redis://localhost:$WORKTREE_PORT_1"
 
 echo "Setup complete!"
 "#

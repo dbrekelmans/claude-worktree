@@ -82,6 +82,60 @@ src/
 }
 ```
 
+## Testing
+
+### Structure
+
+```
+tests/
+├── helpers/
+│   └── mod.rs           # TestEnv shared helper
+├── general.rs           # help, version, no-args
+├── init.rs              # init command tests
+├── new.rs               # new command tests
+├── list.rs              # list command tests
+├── status.rs            # status command tests
+├── path.rs              # path command tests
+├── close.rs             # close command tests
+├── rename.rs            # rename command tests
+├── dotenv.rs            # dotenv command tests
+├── run_stop.rs          # run and stop command tests
+├── cp.rs                # cp command tests
+└── completions.rs       # completions command test
+```
+
+### Running tests
+
+```bash
+cargo test               # All tests (unit + integration)
+cargo test --test init   # Run only init tests
+cargo test --test new    # Run only new tests
+```
+
+### TestEnv helper
+
+All integration tests use `TestEnv` from `tests/helpers/mod.rs`, which creates a fully isolated environment:
+- Fake `$HOME` in a temp directory (cleaned up on drop)
+- Pre-seeded `~/.config/worktree/config.json` to skip interactive setup
+- A git repo at `$HOME/project` with one commit
+
+Key helper methods:
+- `cmd()` / `cmd_in(dir)` — build a `Command` targeting the binary with the fake HOME
+- `init_project()` — runs `init --defaults --no-scripts --no-ai`
+- `init_project_with_scripts()` — runs `init --defaults --no-ai` (generates template scripts)
+- `create_worktree()` / `create_worktree_with_scripts()` — init + new, returns the worktree name
+- `find_worktree_dir(name)` — resolves `~/.worktree/worktrees/project/<name>`
+- `git(args)` — run git commands in the test repo
+
+### Writing new tests
+
+- One test file per command (or closely related pair like run/stop)
+- Each file declares `mod helpers;` and uses `helpers::TestEnv`
+- Tests verify both stdout/stderr output AND filesystem side-effects (files created, JSON content, permissions)
+- Use `--no-ai` flag on init to avoid Claude CLI calls in tests
+- For tests that need scripts in worktrees: use `create_worktree_with_scripts()` which commits `.worktree/` to git before creating the worktree (since `git worktree add` only copies tracked files)
+- Commands not tested: `open` (requires terminal emulator), `cleanup` (requires interactive selection)
+
 ## Development Notes
 
 - Issue tracking: https://linear.app/riotbyte/team/TREE

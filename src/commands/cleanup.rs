@@ -135,7 +135,7 @@ fn find_worktrees_with_activity() -> Result<Vec<WorktreeInfo>> {
         .collect();
 
     // Sort by days inactive (most inactive first)
-    result.sort_by(|a, b| b.days_inactive.cmp(&a.days_inactive));
+    result.sort_by_key(|entry| std::cmp::Reverse(entry.days_inactive));
 
     Ok(result)
 }

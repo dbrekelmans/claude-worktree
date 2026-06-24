@@ -97,7 +97,7 @@ pub fn find_all_worktrees() -> Result<Vec<WorktreeState>> {
         }
     }
 
-    worktrees.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    worktrees.sort_by_key(|worktree| std::cmp::Reverse(worktree.created_at));
     Ok(worktrees)
 }
 

@@ -183,9 +183,29 @@ pub fn launch(terminal: &Terminal, dir: &Path) -> Result<()> {
     }
 }
 
+/// Sanitize a string for use within a tmux session name.
+///
+/// tmux treats characters like `.` and `:` specially in session names, so any
+/// non-alphanumeric character is converted to an underscore.
+fn sanitize_tmux_name_part(part: &str) -> String {
+    part.chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() {
+                character
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
 /// Generate the tmux session name for a worktree
 pub fn tmux_session_name(project_name: &str, worktree_name: &str) -> String {
-    format!("{}-{}", project_name, worktree_name)
+    format!(
+        "{}-{}",
+        sanitize_tmux_name_part(project_name),
+        sanitize_tmux_name_part(worktree_name)
+    )
 }
 
 /// Check if we're currently inside a tmux session
@@ -459,6 +479,30 @@ mod tests {
         let result = shell_escape("/path/with;semicolon");
         // Inside single quotes, semicolon is literal
         assert_eq!(result, "'/path/with;semicolon'");
+    }
+
+    #[test]
+    fn test_tmux_session_name_simple() {
+        assert_eq!(
+            tmux_session_name("my-project", "swift-falcon"),
+            "my_project-swift_falcon"
+        );
+    }
+
+    #[test]
+    fn test_tmux_session_name_sanitizes_dots() {
+        assert_eq!(
+            tmux_session_name("my.project", "swift.falcon"),
+            "my_project-swift_falcon"
+        );
+    }
+
+    #[test]
+    fn test_tmux_session_name_sanitizes_special_chars() {
+        assert_eq!(
+            tmux_session_name("my:proj.v2", "foo bar"),
+            "my_proj_v2-foo_bar"
+        );
     }
 
     #[test]
